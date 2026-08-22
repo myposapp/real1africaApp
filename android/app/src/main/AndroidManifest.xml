@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
-        android:label="estate_ease"
+        android:label="REAL1 AFRICA"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
