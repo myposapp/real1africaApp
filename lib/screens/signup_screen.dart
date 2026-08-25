@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/estate_provider.dart';
+import '../providers/person_provider.dart';
+import '../providers/preferences_provider.dart';
+import '../network/provider/network_provider.dart';
+import '../data/static_configs.dart';
 import '../models/country.dart';
 import '../data/countries_data.dart';
 import '../widgets/phone_input_field.dart';
@@ -112,17 +116,55 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     setState(() => _isLoading = true);
 
-    // Simulate network account creation
-    await Future.delayed(const Duration(milliseconds: 1500));
+    final networkRepo = context.read<NetworkProvider>().networkRepo;
+    final phone = '${_selectedCountry.dialCode}${_phoneController.text.trim()}';
 
-    if (!mounted) return;
+    try {
+      final response = await networkRepo.signUp(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: phone,
+        password: _passwordController.text,
+      );
 
-    setState(() => _isLoading = false);
+      if (!mounted) return;
 
-    final provider = Provider.of<EstateProvider>(context, listen: false);
-    provider.login(_emailController.text, name: _nameController.text);
+      final profile = response.data;
+      if (response.success != true || profile == null) {
+        setState(() {
+          _isLoading = false;
+          _errorBanner = response.message ?? 'Could not create your account.';
+        });
+        return;
+      }
 
-    Navigator.pushReplacementNamed(context, '/home');
+      context.read<ProfileProvider>().setUserProfile(
+        profile,
+        source: UserSource.network,
+      );
+      await context.read<PreferenceProvider>().setString(
+        EstateConfigs.profileKey,
+        profile.toJson(),
+      );
+
+      if (!mounted) return;
+
+      // Keeps the rest of the app's demo/mock UI in sync with the signed-in user.
+      Provider.of<EstateProvider>(
+        context,
+        listen: false,
+      ).login(_emailController.text.trim(), name: profile.name);
+
+      setState(() => _isLoading = false);
+
+      Navigator.pushReplacementNamed(context, '/main');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorBanner = 'Something went wrong. Please check your connection.';
+      });
+    }
   }
 
   @override
@@ -547,10 +589,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
-                                                SizedBox(width: 6),
+                                                SizedBox(width: 3),
                                                 Icon(
                                                   Icons.how_to_reg,
-                                                  size: 18,
+                                                  size: 15,
                                                 ),
                                               ],
                                             ),

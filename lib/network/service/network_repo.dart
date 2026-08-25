@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../../data/device_info.dart';
 import '../../models/analytics.dart';
+import '../../models/home_content.dart';
 import '../../models/kyc_document.dart';
 import '../../models/property.dart';
 import '../../models/property_category.dart';
@@ -120,9 +121,9 @@ class NetworkRepo {
     return BaseResponse.fromMap<UserProfile>(response);
   }
 
-  Future<BaseResponse<dynamic>> getHomeContent() async {
+  Future<BaseResponse<HomeContent>> getHomeContent() async {
     final response = await _client.getHomeContent() as Map<String, dynamic>;
-    return BaseResponse.fromMap<dynamic>(response);
+    return BaseResponse.fromMap<HomeContent>(response);
   }
 
   Future<BaseResponse<Analytics>> getAnalytics() async {

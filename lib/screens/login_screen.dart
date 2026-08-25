@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/estate_provider.dart';
+import '../providers/person_provider.dart';
+import '../providers/preferences_provider.dart';
+import '../network/provider/network_provider.dart';
+import '../data/static_configs.dart';
 import '../models/country.dart';
 import '../data/countries_data.dart';
 import '../widgets/phone_input_field.dart';
@@ -60,34 +64,61 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    // Simulate network authentication
-    await Future.delayed(const Duration(milliseconds: 1400));
+    final networkRepo = context.read<NetworkProvider>().networkRepo;
+    final identifier = _isPhoneMode
+        ? '${_selectedCountry.dialCode}${_phoneController.text.trim()}'
+        : _emailController.text.trim();
 
-    if (!mounted) return;
-
-    setState(() => _isLoading = false);
-
-    // Demo password validation check
-    if (_passwordController.text == 'wrongpass') {
-      setState(
-        () =>
-            _errorBanner = 'Invalid credentials. Please verify your password.',
+    try {
+      final response = await networkRepo.login(
+        email: _isPhoneMode ? null : identifier,
+        phone: _isPhoneMode ? identifier : null,
+        password: _passwordController.text,
       );
-      return;
+
+      if (!mounted) return;
+
+      final profile = response.data;
+      if (response.success != true || profile == null) {
+        setState(() {
+          _isLoading = false;
+          _errorBanner =
+              response.message ??
+              'Invalid credentials. Please verify your password.';
+        });
+        return;
+      }
+
+      context.read<ProfileProvider>().setUserProfile(
+        profile,
+        source: UserSource.network,
+      );
+      await context.read<PreferenceProvider>().setString(
+        EstateConfigs.profileKey,
+        profile.toJson(),
+      );
+
+      if (!mounted) return;
+
+      // Keeps the rest of the app's demo/mock UI in sync with the signed-in user.
+      Provider.of<EstateProvider>(
+        context,
+        listen: false,
+      ).login(identifier, name: profile.name);
+
+      setState(() => _isLoading = false);
+
+      Navigator.pushReplacementNamed(context, '/main');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorBanner = 'Something went wrong. Please check your connection.';
+      });
     }
-
-    // Success login
-    final provider = Provider.of<EstateProvider>(context, listen: false);
-    provider.login(
-      _isPhoneMode
-          ? '${_selectedCountry.dialCode} ${_phoneController.text}'
-          : _emailController.text,
-    );
-
-    Navigator.pushReplacementNamed(context, '/home');
   }
 
-  void _autofillDemo() {
+  /*void _autofillDemo() {
     setState(() {
       _isPhoneMode = false;
       _emailController.text = 'alex.morgan@estate.com';
@@ -95,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorBanner = null;
       _phoneError = null;
     });
-  }
+  }*/
 
   @override
   Widget build(BuildContext context) {
@@ -218,99 +249,119 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(20.0),
+                      padding: const EdgeInsets.symmetric(vertical: 20.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // Segmented toggle: Email vs Phone
-                          SegmentedButton<bool>(
-                            segments: const [
-                              ButtonSegment(
-                                value: false,
-                                label: Text('Email'),
-                                icon: Icon(Icons.email_outlined, size: 16),
-                              ),
-                              ButtonSegment(
-                                value: true,
-                                label: Text('Phone'),
-                                icon: Icon(Icons.phone_outlined, size: 16),
-                              ),
-                            ],
-                            selected: {_isPhoneMode},
-                            onSelectionChanged: (val) {
-                              setState(() {
-                                _isPhoneMode = val.first;
-                                _errorBanner = null;
-                                _phoneError = null;
-                              });
-                            },
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0,
+                            ),
+                            child: SegmentedButton<bool>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: false,
+                                  label: Text('Email'),
+                                  icon: Icon(Icons.email_outlined, size: 16),
+                                ),
+                                ButtonSegment(
+                                  value: true,
+                                  label: Text('Phone'),
+                                  icon: Icon(Icons.phone_outlined, size: 16),
+                                ),
+                              ],
+                              selected: {_isPhoneMode},
+                              onSelectionChanged: (val) {
+                                setState(() {
+                                  _isPhoneMode = val.first;
+                                  _errorBanner = null;
+                                  _phoneError = null;
+                                });
+                              },
+                            ),
                           ),
                           const SizedBox(height: 16),
 
                           // Email or Phone field
                           if (!_isPhoneMode)
-                            TextFormField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: InputDecoration(
-                                labelText: 'Email Address',
-                                hintText: 'alex.morgan@estate.com',
-                                prefixIcon: const Icon(Icons.mail_outline),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20.0,
                               ),
-                              validator: (val) {
-                                if (val == null || val.trim().isEmpty) {
-                                  return 'Email is required';
-                                }
-                                if (!val.contains('@')) {
-                                  return 'Please enter a valid email';
-                                }
-                                return null;
-                              },
+                              child: TextFormField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: InputDecoration(
+                                  labelText: 'Email Address',
+                                  hintText: 'alex.morgan@estate.com',
+                                  prefixIcon: const Icon(Icons.mail_outline),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                validator: (val) {
+                                  if (val == null || val.trim().isEmpty) {
+                                    return 'Email is required';
+                                  }
+                                  if (!val.contains('@')) {
+                                    return 'Please enter a valid email';
+                                  }
+                                  return null;
+                                },
+                              ),
                             )
                           else
-                            PhoneInputField(
-                              controller: _phoneController,
-                              selectedCountry: _selectedCountry,
-                              onCountryChanged: (c) =>
-                                  setState(() => _selectedCountry = c),
-                              errorText: _phoneError,
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20.0,
+                              ),
+                              child: PhoneInputField(
+                                controller: _phoneController,
+                                selectedCountry: _selectedCountry,
+                                onCountryChanged: (c) =>
+                                    setState(() => _selectedCountry = c),
+                                errorText: _phoneError,
+                              ),
                             ),
 
                           const SizedBox(height: 16),
 
                           // Password field
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                ),
-                                onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword,
-                                ),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20.0,
                             ),
-                            validator: (val) {
-                              if (val == null || val.isEmpty) {
-                                return 'Password is required';
-                              }
-                              if (val.length < 6) {
-                                return 'Password must be at least 6 characters';
-                              }
-                              return null;
-                            },
+                            child: TextFormField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscurePassword = !_obscurePassword,
+                                  ),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              validator: (val) {
+                                if (val == null || val.isEmpty) {
+                                  return 'Password is required';
+                                }
+                                if (val.length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                return null;
+                              },
+                            ),
                           ),
 
                           const SizedBox(height: 8),
@@ -408,7 +459,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 16),
+                  /*const SizedBox(height: 16),
 
                   // Quick Demo Autofill Button
                   Center(
@@ -417,8 +468,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       icon: const Icon(Icons.bolt, size: 16),
                       label: const Text('Auto-fill Test Demo Credentials'),
                     ),
-                  ),
-
+                  ),*/
                   const SizedBox(height: 20),
 
                   // Sign up link

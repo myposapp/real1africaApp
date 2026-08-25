@@ -18,17 +18,21 @@ import 'screens/signup_screen.dart';
 
 import 'main.init.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
   initializeMappers();
+
+  final prefProvider = await PreferenceProvider.create();
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => EstateProvider()),
-        ChangeNotifierProvider(create: (_) => ProfileProvider()),
-        Provider(create: (_) => NetworkProvider()),
-        Provider(create: (_) => PreferenceProvider()),
+        ChangeNotifierProvider(create: (_) => ProfileProvider(), lazy: false),
+        Provider(create: (_) => NetworkProvider(), lazy: false),
+        Provider.value(value: prefProvider),
       ],
       child: const EstateEaseApp(),
     ),

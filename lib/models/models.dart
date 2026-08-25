@@ -26,6 +26,11 @@ class Property {
   final List<Amenity> amenities;
   final String managerId;
   final String managerName;
+  final String? category;
+  final String? subcategory;
+  final String? status;
+  final String? visibility;
+  final String? addedAt;
 
   Property({
     required this.id,
@@ -48,6 +53,51 @@ class Property {
     required this.amenities,
     required this.managerId,
     required this.managerName,
+    this.category,
+    this.subcategory,
+    this.status = 'Active',
+    this.visibility = 'Public',
+    this.addedAt,
+  });
+}
+
+class KYCDocument {
+  final String id;
+  final String name;
+  final String type;
+  final String status;
+  final String? fileUrl;
+  final String uploadedAt;
+
+  KYCDocument({
+    required this.id,
+    required this.name,
+    required this.type,
+    this.status = 'Pending',
+    this.fileUrl,
+    required this.uploadedAt,
+  });
+}
+
+class SubscriptionPlan {
+  final String id;
+  final String name;
+  final String? badge;
+  final double monthlyPrice;
+  final double quarterlyPrice;
+  final double yearlyPrice;
+  final int maxListings;
+  final List<String> features;
+
+  SubscriptionPlan({
+    required this.id,
+    required this.name,
+    this.badge,
+    required this.monthlyPrice,
+    required this.quarterlyPrice,
+    required this.yearlyPrice,
+    required this.maxListings,
+    required this.features,
   });
 }
 

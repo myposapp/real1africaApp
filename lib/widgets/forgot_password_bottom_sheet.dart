@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/country.dart';
 import '../data/countries_data.dart';
+import '../network/provider/network_provider.dart';
 import 'phone_input_field.dart';
 
 class ForgotPasswordBottomSheet extends StatefulWidget {
@@ -92,14 +94,41 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
       }
     }
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
+    final networkRepo = context.read<NetworkProvider>().networkRepo;
+    final identifier = _isPhoneMode
+        ? '${_selectedCountry.dialCode}${_phoneController.text.trim()}'
+        : _emailController.text.trim();
 
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      _currentStep = 1;
-    });
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await networkRepo.requestForgotPasswordOtp(
+        email: _isPhoneMode ? null : identifier,
+        phone: _isPhoneMode ? identifier : null,
+      );
+
+      if (!mounted) return;
+
+      if (response.success != true) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage =
+              response.message ?? 'Could not send the verification code.';
+        });
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _currentStep = 1;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Something went wrong. Please check your connection.';
+      });
+    }
   }
 
   Future<void> _handleVerifyOtp() async {
@@ -113,14 +142,9 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
       return;
     }
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1100));
-
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      _currentStep = 2;
-    });
+    // The code is verified together with the new password in the final step;
+    // there is no standalone OTP-verification endpoint.
+    setState(() => _currentStep = 2);
   }
 
   Future<void> _handleResetPassword() async {
@@ -135,14 +159,45 @@ class _ForgotPasswordBottomSheetState extends State<ForgotPasswordBottomSheet> {
       return;
     }
 
+    final networkRepo = context.read<NetworkProvider>().networkRepo;
+    final identifier = _isPhoneMode
+        ? '${_selectedCountry.dialCode}${_phoneController.text.trim()}'
+        : _emailController.text.trim();
+    final otp = _otpControllers.map((c) => c.text).join();
+
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+    try {
+      final response = await networkRepo.resetPassword(
+        email: _isPhoneMode ? null : identifier,
+        phone: _isPhoneMode ? identifier : null,
+        code: otp,
+        password: _passwordController.text,
+      );
 
-    Navigator.pop(context);
-    widget.onSuccess?.call('Password reset successfully! You can now log in.');
+      if (!mounted) return;
+
+      if (response.success != true) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = response.message ?? 'Could not reset your password.';
+        });
+        return;
+      }
+
+      setState(() => _isLoading = false);
+
+      Navigator.pop(context);
+      widget.onSuccess?.call(
+        'Password reset successfully! You can now log in.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Something went wrong. Please check your connection.';
+      });
+    }
   }
 
   @override
