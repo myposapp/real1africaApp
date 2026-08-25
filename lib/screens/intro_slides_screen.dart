@@ -1,12 +1,15 @@
+import 'package:estate_ease/data/static_configs.dart';
+import 'package:estate_ease/providers/preferences_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-class IntroSlide {
+class _IntroSlide {
   final String title;
   final String description;
   final IconData icon;
   final String badgeText;
 
-  IntroSlide({
+  _IntroSlide({
     required this.title,
     required this.description,
     required this.icon,
@@ -25,22 +28,22 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
 
-  final List<IntroSlide> _slides = [
-    IntroSlide(
+  final List<_IntroSlide> _slides = [
+    _IntroSlide(
       title: 'Discover Luxury & Comfort',
       description:
           'Explore verified premium properties, villas, and apartments tailored to your exact taste with real-time tour scheduling.',
       icon: Icons.home_work_rounded,
       badgeText: 'Property Search',
     ),
-    IntroSlide(
+    _IntroSlide(
       title: 'Seamless Estate Management',
       description:
           'Connect directly with certified property managers, view detailed performance metrics, and submit inquiries instantly.',
       icon: Icons.business_center_rounded,
       badgeText: 'Verified Managers',
     ),
-    IntroSlide(
+    _IntroSlide(
       title: 'Effortless In-App Booking',
       description:
           'Book home viewings in two clicks and communicate directly with property agents through integrated real-time chat.',
@@ -56,8 +59,17 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      Navigator.pushReplacementNamed(context, '/main');
+      Navigator.pushReplacementNamed(context, '/login');
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<PreferenceProvider>().setBool(
+      EstateConfigs.onboardedKey,
+      true,
+    );
   }
 
   @override
@@ -91,7 +103,7 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'EstateEase',
+                        'Real1 Africa',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -102,7 +114,7 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
                   ),
                   TextButton(
                     onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/main'),
+                        Navigator.pushReplacementNamed(context, '/login'),
                     child: Text(
                       'Skip',
                       style: TextStyle(

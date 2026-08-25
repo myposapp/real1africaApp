@@ -11,7 +11,7 @@ class EstateProvider extends ChangeNotifier {
   Property? _selectedProperty;
   EstateManager? _selectedManager;
 
-  final UserProfile _user = UserProfile(
+  var _user = UserProfile(
     fullName: 'Sarah Jenkins',
     email: 'sarah.jenkins@example.com',
     phone: '+1 (555) 382-9102',
@@ -386,6 +386,27 @@ class EstateProvider extends ChangeNotifier {
 
   void bookViewing(ViewingBooking booking) {
     _viewings.insert(0, booking);
+    notifyListeners();
+  }
+
+  bool _isLoggedIn = true;
+  bool get isLoggedIn => _isLoggedIn;
+
+  void login(String identifier, {String? name}) {
+    _isLoggedIn = true;
+    _user = UserProfile(
+      fullName:
+          name ??
+          (identifier.contains('@') ? identifier.split('@')[0] : 'Estate User'),
+      email: identifier.contains('@') ? identifier : 'user@estate.com',
+      phone: !identifier.contains('@') ? identifier : '+1 (555) 382-9102',
+      avatar: _user.avatar,
+    );
+    notifyListeners();
+  }
+
+  void logout() {
+    _isLoggedIn = false;
     notifyListeners();
   }
 }

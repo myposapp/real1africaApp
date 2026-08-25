@@ -1,5 +1,9 @@
+import 'package:estate_ease/data/static_configs.dart';
+import 'package:estate_ease/providers/preferences_provider.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
+
+import 'package:provider/provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -8,10 +12,13 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+
+  var showIntro = false;
 
   @override
   void initState() {
@@ -21,19 +28,26 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       duration: const Duration(milliseconds: 1500),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
-    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.85,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
     _controller.forward();
 
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/intro');
+        var prefs = context.read<PreferenceProvider>();
+        if (prefs.getBool(EstateConfigs.onboardedKey) == true) {
+          Navigator.pushReplacementNamed(context, '/main');
+        } else {
+          Navigator.pushReplacementNamed(context, '/intro');
+        }
       }
     });
   }
@@ -54,11 +68,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF003838),
-              Color(0xFF006767),
-              Color(0xFF008282),
-            ],
+            colors: [Color(0xFF003838), Color(0xFF006767), Color(0xFF008282)],
           ),
         ),
         child: FadeTransition(
@@ -76,10 +86,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
-                      )
+                      ),
                     ],
                   ),
                   child: const Center(
@@ -92,7 +102,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'EstateEase',
+                  'Real1 Africa',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 32,
@@ -104,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 Text(
                   'Modern Property Management Simplified',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),

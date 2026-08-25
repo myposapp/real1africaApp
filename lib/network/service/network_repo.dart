@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import '../../data/device_info.dart';
 import '../../models/analytics.dart';
 import '../../models/kyc_document.dart';
 import '../../models/property.dart';
@@ -19,9 +20,72 @@ class NetworkRepo {
 
   NetworkRepo(this._client, this._dio);
 
-  Future<BaseResponse<UserProfile>> login(Map<String, dynamic> body) async {
+  Future<BaseResponse<UserProfile>> login({
+    String? email,
+    String? phone,
+    required String password,
+  }) async {
+    final body = {
+      if (email != null) "email": email,
+      if (phone != null) "phone": phone,
+      "password": password,
+    };
+
     final response = await _client.login(body) as Map<String, dynamic>;
     return BaseResponse.fromMap<UserProfile>(response);
+  }
+
+  Future<BaseResponse<UserProfile>> signUp({
+    required String name,
+    required String email,
+    required String phone,
+    required String password,
+  }) async {
+    final body = {
+      "name": name,
+      "email": email,
+      "phone": phone,
+      "password": password,
+    };
+
+    final response = await _client.signUp(body) as Map<String, dynamic>;
+    return BaseResponse.fromMap<UserProfile>(response);
+  }
+
+  Future<BaseResponse<void>> requestForgotPasswordOtp({
+    String? email,
+    String? phone,
+  }) async {
+    final body = {
+      if (email != null) "email": email,
+      if (phone != null) "phone": phone,
+    };
+
+    final response =
+        await _client.requestForgotPasswordOtp(body) as Map<String, dynamic>;
+    return BaseResponse.fromMap<void>(response);
+  }
+
+  Future<BaseResponse<void>> resetPassword({
+    String? email,
+    String? phone,
+    required String code,
+    required String password,
+  }) async {
+    final body = {
+      if (email != null) "email": email,
+      if (phone != null) "phone": phone,
+      "code": code,
+      "password": password,
+    };
+
+    final response = await _client.resetPassword(body) as Map<String, dynamic>;
+    return BaseResponse.fromMap<void>(response);
+  }
+
+  Future<BaseResponse<void>> deleteAccount() async {
+    final response = await _client.deleteAccount() as Map<String, dynamic>;
+    return BaseResponse.fromMap<void>(response);
   }
 
   Future<BaseResponse<UserProfile>> getUserProfile() async {
@@ -141,6 +205,14 @@ class NetworkRepo {
     return BaseResponse.fromMap<List<SavedProperty>>(response);
   }
 
+  Future<BaseResponse<void>> registerFingerprint() async {
+    final body = await DeviceInfoBody.build();
+
+    final response =
+        await _client.registerFingerprint(body) as Map<String, dynamic>;
+    return BaseResponse.fromMap<void>(response);
+  }
+
   Future<BaseResponse<void>> saveProperty(String propertyId) async {
     final response =
         await _client.saveProperty(propertyId) as Map<String, dynamic>;
@@ -172,8 +244,7 @@ class NetworkRepo {
     };
 
     final response =
-        await _client.reportProperty(propertyId, body)
-            as Map<String, dynamic>;
+        await _client.reportProperty(propertyId, body) as Map<String, dynamic>;
     return BaseResponse.fromMap<void>(response);
   }
 
@@ -303,8 +374,7 @@ class NetworkRepo {
       userId: userId,
     );
 
-    final response =
-        await _client.createProperty(body) as Map<String, dynamic>;
+    final response = await _client.createProperty(body) as Map<String, dynamic>;
     return BaseResponse.fromMap<Property>(response);
   }
 
@@ -343,8 +413,7 @@ class NetworkRepo {
     );
 
     final response =
-        await _client.updateProperty(propertyId, body)
-            as Map<String, dynamic>;
+        await _client.updateProperty(propertyId, body) as Map<String, dynamic>;
     return BaseResponse.fromMap<Property>(response);
   }
 
@@ -412,8 +481,7 @@ class NetworkRepo {
     };
 
     final response =
-        await _client.submitKyc(FormData.fromMap(body))
-            as Map<String, dynamic>;
+        await _client.submitKyc(FormData.fromMap(body)) as Map<String, dynamic>;
     return BaseResponse.fromMap<KycDocument>(response);
   }
 
@@ -440,8 +508,7 @@ class NetworkRepo {
   }
 
   Future<BaseResponse<void>> deleteKyc(String kycId) async {
-    final response =
-        await _client.deleteKyc(kycId) as Map<String, dynamic>;
+    final response = await _client.deleteKyc(kycId) as Map<String, dynamic>;
     return BaseResponse.fromMap<void>(response);
   }
 }

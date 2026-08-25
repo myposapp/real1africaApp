@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:retrofit/retrofit.dart';
-import '../../models/static_configs.dart';
+import '../../data/static_configs.dart';
 
 part 'network_service.g.dart';
 
@@ -70,6 +70,9 @@ abstract class NetworkClient {
   @POST("/api/auth/me/kyc")
   @MultiPart()
   Future<dynamic> submitKyc(@Body() FormData body);
+
+  @POST("/api/utils/fingerprint")
+  Future<dynamic> registerFingerprint(@Body() Map<String, dynamic> body);
 
   @PUT("/api/auth/me")
   @MultiPart()

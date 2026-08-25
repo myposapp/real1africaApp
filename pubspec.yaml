@@ -17,6 +17,11 @@ dependencies:
   cookie_jar: ^4.0.9
   dio: ^5.9.2
   shared_preferences: ^2.5.5
+  dio_cookie_manager: ^3.5.0
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  device_info_plus: ^13.2.0
+  flutter_timezone: ^5.1.0
 
 dev_dependencies:
   flutter_test:

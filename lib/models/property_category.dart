@@ -1,5 +1,5 @@
 import 'package:dart_mappable/dart_mappable.dart';
-import 'static_configs.dart';
+import '../data/static_configs.dart';
 
 part 'property_category.mapper.dart';
 

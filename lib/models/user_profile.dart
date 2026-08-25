@@ -1,6 +1,6 @@
 import 'package:dart_mappable/dart_mappable.dart';
 import 'kyc_document.dart';
-import 'static_configs.dart';
+import '../data/static_configs.dart';
 
 part 'user_profile.mapper.dart';
 
