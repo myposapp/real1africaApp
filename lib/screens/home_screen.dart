@@ -1,19 +1,134 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/home_content.dart';
+import '../network/provider/network_provider.dart';
 import '../providers/estate_provider.dart';
-//import '../models/models.dart';
+import '../providers/person_provider.dart';
+import '../widgets/property_carousel_card.dart';
 import 'property_detail_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  HomeContent? _homeContent;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final networkRepo = context.read<NetworkProvider>().networkRepo;
+
+    try {
+      final response = await networkRepo.getHomeContent();
+      if (!mounted) return;
+      setState(() {
+        _homeContent = response.data;
+        _isLoading = false;
+        if (response.success != true) {
+          _error = response.message ?? 'Could not load home content.';
+        }
+      });
+
+      // Best-effort hydration so heart icons reflect saved state right away.
+      try {
+        final savedResponse = await networkRepo.getSavedProperties(
+          pageSize: 100,
+        );
+        if (mounted && savedResponse.success == true) {
+          context.read<EstateProvider>().setSavedPropertyIds(
+            (savedResponse.data ?? []).map((s) => s.property.id),
+          );
+        }
+      } catch (_) {
+        // Non-critical; heart icons simply stay unhydrated.
+      }
+    } catch (error) {
+      debugPrint(error.toString());
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = 'Could not load home content. Check your connection.';
+      });
+    }
+  }
+
+  void _goToSearch({
+    String? purpose,
+    String? categoryId,
+    String? categoryTitle,
+  }) {
+    final estateProvider = context.read<EstateProvider>();
+    if (purpose != null) estateProvider.setActiveTab(purpose);
+    if (categoryId != null) {
+      estateProvider.setSelectedCategory(categoryId, categoryTitle);
+    }
+    estateProvider.setNavIndex(1);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      final theme = Theme.of(context);
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                size: 40,
+                color: theme.colorScheme.error,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(onRefresh: _load, child: _buildContent(context));
+  }
+
+  Widget _buildContent(BuildContext context) {
     final estateProvider = context.watch<EstateProvider>();
-    final properties = estateProvider.properties;
+    final profile = context.watch<ProfileProvider>().profile;
     final theme = Theme.of(context);
+    final homeContent = _homeContent;
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,7 +149,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Find Your Ideal Home',
+                    profile?.name ?? 'Find Your Ideal Home',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -45,7 +160,16 @@ class HomeScreen extends StatelessWidget {
               ),
               CircleAvatar(
                 radius: 20,
-                backgroundImage: NetworkImage(estateProvider.user.avatar),
+                backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                backgroundImage: profile?.photoUrl != null
+                    ? NetworkImage(profile!.photoUrl!)
+                    : null,
+                child: profile?.photoUrl == null
+                    ? Icon(
+                        Icons.person,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      )
+                    : null,
               ),
             ],
           ),
@@ -83,193 +207,118 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // Tab Pills Row (Rent / Sales / Lease)
+          // Purpose shortcuts
           Row(
-            children: ['Rent', 'Sales', 'Lease'].map((tab) {
-              final isSelected = estateProvider.activeTab == tab;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: ChoiceChip(
-                  label: Text(tab),
-                  selected: isSelected,
-                  selectedColor: theme.colorScheme.primary,
-                  labelStyle: TextStyle(
-                    color: isSelected
-                        ? Colors.white
-                        : theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  onSelected: (selected) {
-                    if (selected) estateProvider.setActiveTab(tab);
-                  },
-                ),
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Featured Section Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Featured Estates',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onSurface,
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _goToSearch(purpose: 'sale'),
+                  icon: const Icon(Icons.sell_outlined, size: 16),
+                  label: const Text('For Sale'),
                 ),
               ),
-              TextButton(
-                onPressed: () => estateProvider.setNavIndex(1),
-                child: const Text(
-                  'See All',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _goToSearch(purpose: 'rent'),
+                  icon: const Icon(Icons.key_outlined, size: 16),
+                  label: const Text('For Rent'),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 12),
-
-          // Featured Horizontal Carousel
-          SizedBox(
-            height: 260,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: properties.length,
-              itemBuilder: (context, index) {
-                final item = properties[index];
-                return GestureDetector(
-                  onTap: () {
-                    estateProvider.setSelectedProperty(item);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PropertyDetailScreen(property: item),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    width: 220,
-                    margin: const EdgeInsets.only(right: 16),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: theme.colorScheme.outlineVariant.withValues(
-                          alpha: 0.3,
-                        ),
-                      ),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Stack(
-                          children: [
-                            Image.network(
-                              item.image,
-                              height: 140,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: CircleAvatar(
-                                radius: 16,
-                                backgroundColor: Colors.white.withValues(
-                                  alpha: 0.85,
-                                ),
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  icon: Icon(
-                                    item.isFavorite
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    size: 18,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () =>
-                                      estateProvider.toggleFavorite(item.id),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(12.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.location,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '\$${item.price.toInt()}${item.priceUnit}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      color: theme.colorScheme.primary,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.star,
-                                        size: 14,
-                                        color: Colors.amber,
-                                      ),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        '${item.rating}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+          if (homeContent != null &&
+              (homeContent.propertyCount > 0 ||
+                  homeContent.agentCount > 0)) ...[
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    label: 'Properties',
+                    value: '${homeContent.propertyCount}',
+                    icon: Icons.home_work_outlined,
+                    theme: theme,
                   ),
-                );
-              },
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _StatTile(
+                    label: 'Verified Agents',
+                    value: '${homeContent.agentCount}',
+                    icon: Icons.verified_outlined,
+                    theme: theme,
+                  ),
+                ),
+              ],
             ),
-          ),
+          ],
+
+          if (homeContent != null && homeContent.categories.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Text(
+              'Browse by Category',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 96,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: homeContent.categories.length,
+                itemBuilder: (context, index) {
+                  final category = homeContent.categories[index];
+                  return GestureDetector(
+                    onTap: () => _goToSearch(
+                      categoryId: category.id,
+                      categoryTitle: category.title,
+                    ),
+                    child: Container(
+                      width: 92,
+                      margin: const EdgeInsets.only(right: 12),
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 28,
+                            backgroundColor:
+                                theme.colorScheme.surfaceContainerHighest,
+                            backgroundImage: NetworkImage(category.imageUrl),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${category.title} (${category.count})',
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+
+          if (homeContent != null)
+            ...homeContent.shelves
+                .where((s) => s.items.isNotEmpty)
+                .map((shelf) => _ShelfSection(shelf: shelf)),
 
           const SizedBox(height: 24),
 
-          // Top Managers Snippet Header
+          // Top Managers Snippet Header (dummy — no manager API endpoint yet)
           Text(
             'Verified Managers',
             style: TextStyle(
@@ -280,7 +329,6 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Manager Cards
           ...estateProvider.managers.take(2).map((manager) {
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
@@ -311,6 +359,119 @@ class HomeScreen extends StatelessWidget {
               ),
             );
           }),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final ThemeData theme;
+
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: theme.colorScheme.primary, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ShelfSection extends StatelessWidget {
+  final HomeShelf shelf;
+
+  const _ShelfSection({required this.shelf});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (shelf.eyebrow != null && shelf.eyebrow!.isNotEmpty)
+            Text(
+              shelf.eyebrow!.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          Text(
+            shelf.title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 260,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: shelf.items.length,
+              itemBuilder: (context, index) {
+                final property = shelf.items[index];
+                return PropertyCarouselCard(
+                  property: property,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            PropertyDetailScreen(propertyId: property.id),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

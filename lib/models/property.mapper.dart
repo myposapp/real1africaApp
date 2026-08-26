@@ -28,8 +28,12 @@ class PropertyOwnerMapper extends ClassMapperBase<PropertyOwner> {
     _$id,
     key: r'_id',
   );
-  static String _$name(PropertyOwner v) => v.name;
-  static const Field<PropertyOwner, String> _f$name = Field('name', _$name);
+  static String? _$name(PropertyOwner v) => v.name;
+  static const Field<PropertyOwner, String> _f$name = Field(
+    'name',
+    _$name,
+    opt: true,
+  );
   static String? _$phone(PropertyOwner v) => v.phone;
   static const Field<PropertyOwner, String> _f$phone = Field(
     'phone',
@@ -160,7 +164,7 @@ class _PropertyOwnerCopyWithImpl<$R, $Out>
   @override
   $R call({
     String? id,
-    String? name,
+    Object? name = $none,
     Object? phone = $none,
     Object? email = $none,
     Object? photo = $none,
@@ -168,7 +172,7 @@ class _PropertyOwnerCopyWithImpl<$R, $Out>
   }) => $apply(
     FieldCopyWithData({
       if (id != null) #id: id,
-      if (name != null) #name: name,
+      if (name != $none) #name: name,
       if (phone != $none) #phone: phone,
       if (email != $none) #email: email,
       if (photo != $none) #photo: photo,
@@ -851,6 +855,7 @@ class PropertyMapper extends ClassMapperBase<Property> {
     'owner',
     _$owner,
     key: r'user',
+    hook: _PropertyOwnerHook(),
   );
   static List<PropertyCategoryRef> _$categories(Property v) => v.categories;
   static const Field<Property, List<PropertyCategoryRef>> _f$categories = Field(

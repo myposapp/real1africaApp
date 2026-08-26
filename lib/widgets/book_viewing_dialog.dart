@@ -1,13 +1,18 @@
 import 'package:estate_ease/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/estate_provider.dart';
 import '../models/models.dart';
+import '../providers/estate_provider.dart';
 
 class BookViewingDialog extends StatefulWidget {
-  final Property property;
+  final String propertyId;
+  final String propertyTitle;
 
-  const BookViewingDialog({super.key, required this.property});
+  const BookViewingDialog({
+    super.key,
+    required this.propertyId,
+    required this.propertyTitle,
+  });
 
   @override
   State<BookViewingDialog> createState() => _BookViewingDialogState();
@@ -44,7 +49,7 @@ class _BookViewingDialogState extends State<BookViewingDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Your appointment for ${widget.property.title} on ${_selectedDate.toString().split(' ')[0]} at $_timeSlot has been recorded.',
+              'Your appointment for ${widget.propertyTitle} on ${_selectedDate.toString().split(' ')[0]} at $_timeSlot has been recorded.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
@@ -77,7 +82,7 @@ class _BookViewingDialogState extends State<BookViewingDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.property.title,
+              widget.propertyTitle,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.primary,
@@ -163,8 +168,8 @@ class _BookViewingDialogState extends State<BookViewingDialog> {
             context.read<EstateProvider>().bookViewing(
               ViewingBooking(
                 id: DateTime.now().millisecondsSinceEpoch.toString(),
-                propertyId: widget.property.id,
-                propertyTitle: widget.property.title,
+                propertyId: widget.propertyId,
+                propertyTitle: widget.propertyTitle,
                 date: _selectedDate.toString().split(' ')[0],
                 time: _timeSlot,
               ),

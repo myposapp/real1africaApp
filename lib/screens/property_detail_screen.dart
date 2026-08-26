@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/models.dart';
+import '../models/property.dart';
+import '../network/provider/network_provider.dart';
 import '../providers/estate_provider.dart';
 import '../widgets/book_viewing_dialog.dart';
 import '../widgets/full_map_dialog.dart';
+import '../widgets/property_carousel_card.dart';
+import '../widgets/save_property_button.dart';
 import '../widgets/write_review_dialog.dart';
 
 class PropertyDetailScreen extends StatefulWidget {
-  final Property property;
+  final String propertyId;
 
-  const PropertyDetailScreen({super.key, required this.property});
+  const PropertyDetailScreen({super.key, required this.propertyId});
 
   @override
   State<PropertyDetailScreen> createState() => _PropertyDetailScreenState();
@@ -18,20 +21,173 @@ class PropertyDetailScreen extends StatefulWidget {
 class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
   int _activeImageIndex = 0;
 
+  Property? _property;
+  bool _isLoading = true;
+  String? _error;
+  List<Property> _related = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final networkRepo = context.read<NetworkProvider>().networkRepo;
+
+    try {
+      final response = await networkRepo.getPublicProperty(widget.propertyId);
+      if (!mounted) return;
+
+      if (response.success != true || response.data == null) {
+        setState(() {
+          _isLoading = false;
+          _error = response.message ?? 'This property could not be found.';
+        });
+        return;
+      }
+
+      setState(() {
+        _property = response.data;
+        _isLoading = false;
+      });
+
+      try {
+        final relatedResponse = await networkRepo.getRelatedProperties(
+          widget.propertyId,
+        );
+        if (mounted && relatedResponse.success == true) {
+          setState(() => _related = relatedResponse.data ?? []);
+        }
+      } catch (_) {
+        // Non-critical section; ignore failures.
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = 'Could not load this property. Check your connection.';
+      });
+    }
+  }
+
+  String _priceLabel(Property property) {
+    final price = property.salePrice ?? property.rentPrice;
+    if (price == null) return 'Price on request';
+    final currency = property.currency ?? '₦';
+    final label = '$currency${price.toStringAsFixed(0)}';
+    return property.salePrice == null && property.rentPrice != null
+        ? '$label /period'
+        : label;
+  }
+
+  String _addressLabel(Property property) {
+    final address = property.address;
+    if (address == null) return '';
+    return [
+      address.street,
+      address.city,
+      address.state,
+      address.country,
+    ].where((p) => p != null && p.isNotEmpty).join(', ');
+  }
+
+  String _formatAmenityKey(String key) {
+    final spaced = key
+        .replaceAllMapped(RegExp('([A-Z])'), (m) => ' ${m.group(0)}')
+        .trim();
+    if (spaced.isEmpty) return spaced;
+    return spaced[0].toUpperCase() + spaced.substring(1);
+  }
+
+  String? _formatAmenityValue(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value.trim().isEmpty ? null : value;
+    if (value is List) {
+      final items = value
+          .map((e) => e.toString())
+          .where((s) => s.trim().isNotEmpty)
+          .toList();
+      return items.isEmpty ? null : items.join(', ');
+    }
+    if (value is num) return value == 0 ? null : '$value';
+    if (value is bool) return value ? 'Yes' : null;
+    return value.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null || _property == null) {
+      final theme = Theme.of(context);
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.wifi_off_rounded,
+                  size: 40,
+                  color: theme.colorScheme.error,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _error ?? 'This property could not be found.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return _buildDetail(context, _property!);
+  }
+
+  Widget _buildDetail(BuildContext context, Property property) {
     final estateProvider = context.watch<EstateProvider>();
     final theme = Theme.of(context);
-    final property = widget.property;
 
     final propertyReviews = estateProvider.reviews
         .where((r) => r.propertyId == property.id)
         .toList();
+    final avgRating = propertyReviews.isEmpty
+        ? 0.0
+        : propertyReviews.map((r) => r.rating).reduce((a, b) => a + b) /
+              propertyReviews.length;
+
+    final amenityEntries = property.amenities.entries
+        .map((e) => MapEntry(_formatAmenityKey(e.key), _formatAmenityValue(e.value)))
+        .where((e) => e.value != null)
+        .toList();
+
+    final images = property.media;
 
     return Scaffold(
       body: Stack(
         children: [
-          // Scrollable Details
           SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,40 +198,50 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     SizedBox(
                       height: 320,
                       width: double.infinity,
-                      child: PageView.builder(
-                        itemCount: property.gallery.length,
-                        onPageChanged: (idx) =>
-                            setState(() => _activeImageIndex = idx),
-                        itemBuilder: (context, idx) {
-                          return Image.network(
-                            property.gallery[idx],
-                            fit: BoxFit.cover,
-                          );
-                        },
-                      ),
+                      child: images.isEmpty
+                          ? Container(
+                              color: Colors.grey.shade300,
+                              child: const Icon(Icons.home, size: 60),
+                            )
+                          : PageView.builder(
+                              itemCount: images.length,
+                              onPageChanged: (idx) =>
+                                  setState(() => _activeImageIndex = idx),
+                              itemBuilder: (context, idx) {
+                                return Image.network(
+                                  images[idx].fullUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Container(
+                                    color: Colors.grey.shade300,
+                                    child: const Icon(Icons.home, size: 60),
+                                  ),
+                                );
+                              },
+                            ),
                     ),
-                    Positioned(
-                      bottom: 12,
-                      right: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          '${_activeImageIndex + 1}/${property.gallery.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                    if (images.isNotEmpty)
+                      Positioned(
+                        bottom: 12,
+                        right: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text(
+                            '${_activeImageIndex + 1}/${images.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     Positioned(
                       top: 40,
                       left: 16,
@@ -93,18 +259,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                     Positioned(
                       top: 40,
                       right: 16,
-                      child: CircleAvatar(
-                        backgroundColor: Colors.white.withValues(alpha: 0.85),
-                        child: IconButton(
-                          icon: Icon(
-                            property.isFavorite
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            color: Colors.red,
-                          ),
-                          onPressed: () =>
-                              estateProvider.toggleFavorite(property.id),
-                        ),
+                      child: SavePropertyButton(
+                        propertyId: property.id,
+                        iconSize: 20,
                       ),
                     ),
                   ],
@@ -129,7 +286,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ),
                           ),
                           Text(
-                            '\$${property.price.toInt()}${property.priceUnit}',
+                            _priceLabel(property),
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
@@ -147,39 +304,27 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             color: theme.colorScheme.primary,
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            property.location,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: theme.colorScheme.onSurfaceVariant,
+                          Expanded(
+                            child: Text(
+                              _addressLabel(property),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ],
                       ),
 
-                      const SizedBox(height: 20),
-
-                      // Key Specs Row
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildSpecTile(
-                            Icons.bed,
-                            '${property.beds} Beds',
-                            theme,
-                          ),
-                          _buildSpecTile(
-                            Icons.bathtub,
-                            '${property.baths} Baths',
-                            theme,
-                          ),
-                          _buildSpecTile(
-                            Icons.square_foot,
-                            '${property.sqft} sqft',
-                            theme,
-                          ),
-                        ],
-                      ),
+                      if (property.categories.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          children: property.categories
+                              .map((c) => Chip(label: Text(c.title)))
+                              .toList(),
+                        ),
+                      ],
 
                       const SizedBox(height: 24),
 
@@ -201,31 +346,31 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 24),
-
-                      // Amenities
-                      const Text(
-                        'Amenities',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      if (amenityEntries.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Property Details',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: property.amenities.map((a) {
-                          return Chip(
-                            avatar: Icon(
-                              Icons.check_circle_outline,
-                              size: 16,
-                              color: theme.colorScheme.primary,
-                            ),
-                            label: Text(a.name),
-                          );
-                        }).toList(),
-                      ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: amenityEntries.map((entry) {
+                            return Chip(
+                              avatar: Icon(
+                                Icons.check_circle_outline,
+                                size: 16,
+                                color: theme.colorScheme.primary,
+                              ),
+                              label: Text('${entry.key}: ${entry.value}'),
+                            );
+                          }).toList(),
+                        ),
+                      ],
 
                       const SizedBox(height: 28),
 
@@ -241,15 +386,7 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ),
                           ),
                           TextButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      FullMapDialog(property: property),
-                                ),
-                              );
-                            },
+                            onPressed: () => _openMap(context, property),
                             icon: const Icon(Icons.map_outlined, size: 18),
                             label: const Text(
                               'View on Map',
@@ -260,16 +397,8 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Map Preview Container Card
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FullMapDialog(property: property),
-                            ),
-                          );
-                        },
+                        onTap: () => _openMap(context, property),
                         child: Container(
                           height: 160,
                           width: double.infinity,
@@ -283,7 +412,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                           ),
                           child: Stack(
                             children: [
-                              // Grid pattern for simulated map background
                               CustomPaint(
                                 size: const Size(double.infinity, 160),
                                 painter: _MapPreviewGridPainter(
@@ -292,7 +420,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                       : Colors.black.withValues(alpha: 0.05),
                                 ),
                               ),
-                              // Location Pin Card
                               Center(
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
@@ -321,19 +448,22 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                                         size: 16,
                                       ),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        property.location,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
+                                      Flexible(
+                                        child: Text(
+                                          property.address?.city ??
+                                              _addressLabel(property),
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
                               ),
-                              // Tap hint badge
                               Positioned(
                                 bottom: 12,
                                 right: 12,
@@ -361,9 +491,44 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                         ),
                       ),
 
+                      if (_related.isNotEmpty) ...[
+                        const SizedBox(height: 28),
+                        const Text(
+                          'Related Properties',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 260,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _related.length,
+                            itemBuilder: (context, index) {
+                              final item = _related[index];
+                              return PropertyCarouselCard(
+                                property: item,
+                                onTap: () {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => PropertyDetailScreen(
+                                        propertyId: item.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 28),
 
-                      // Reviews & Ratings Section
+                      // Reviews & Ratings Section (client-side only; no reviews endpoint)
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -400,68 +565,6 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Rating Breakdown Card
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            // Left summary score
-                            Column(
-                              children: [
-                                Text(
-                                  '${property.rating}',
-                                  style: TextStyle(
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.w900,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                ),
-                                Row(
-                                  children: List.generate(
-                                    5,
-                                    (i) => const Icon(
-                                      Icons.star,
-                                      size: 14,
-                                      color: Colors.amber,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${property.reviewsCount + propertyReviews.length} reviews',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 20),
-                            const VerticalDivider(),
-                            const SizedBox(width: 12),
-                            // Right progress bars
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  _buildRatingBar('5★', 0.85, theme),
-                                  _buildRatingBar('4★', 0.10, theme),
-                                  _buildRatingBar('3★', 0.05, theme),
-                                  _buildRatingBar('2★', 0.00, theme),
-                                  _buildRatingBar('1★', 0.00, theme),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Reviews List
                       if (propertyReviews.isEmpty)
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -489,7 +592,72 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ],
                           ),
                         )
-                      else
+                      else ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Column(
+                                children: [
+                                  Text(
+                                    avgRating.toStringAsFixed(1),
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w900,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: List.generate(
+                                      5,
+                                      (i) => Icon(
+                                        i < avgRating.round()
+                                            ? Icons.star
+                                            : Icons.star_border,
+                                        size: 14,
+                                        color: Colors.amber,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${propertyReviews.length} reviews',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 20),
+                              const VerticalDivider(),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  children: List.generate(5, (i) {
+                                    final star = 5 - i;
+                                    final count = propertyReviews
+                                        .where((r) => r.rating == star)
+                                        .length;
+                                    final ratio = propertyReviews.isEmpty
+                                        ? 0.0
+                                        : count / propertyReviews.length;
+                                    return _buildRatingBar(
+                                      '$star★',
+                                      ratio,
+                                      theme,
+                                    );
+                                  }),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         ...propertyReviews.map((review) {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -563,8 +731,9 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                             ),
                           );
                         }),
+                      ],
 
-                      const SizedBox(height: 100), // Spacing for bottom bar
+                      const SizedBox(height: 100),
                     ],
                   ),
                 ),
@@ -594,8 +763,11 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () {
-                        estateProvider.setNavIndex(3);
-                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Messaging is coming soon.'),
+                          ),
+                        );
                       },
                       icon: const Icon(Icons.chat_bubble_outline),
                       label: const Text('Contact Agent'),
@@ -610,7 +782,10 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
                       onPressed: () {
                         showDialog(
                           context: context,
-                          builder: (_) => BookViewingDialog(property: property),
+                          builder: (_) => BookViewingDialog(
+                            propertyId: property.id,
+                            propertyTitle: property.title,
+                          ),
                         );
                       },
                       style: FilledButton.styleFrom(
@@ -628,22 +803,16 @@ class _PropertyDetailScreenState extends State<PropertyDetailScreen> {
     );
   }
 
-  Widget _buildSpecTile(IconData icon, String text, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: theme.colorScheme.primary, size: 22),
-          const SizedBox(height: 4),
-          Text(
-            text,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          ),
-        ],
+  void _openMap(BuildContext context, Property property) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FullMapDialog(
+          propertyTitle: property.title,
+          priceLabel: _priceLabel(property),
+          addressLabel: _addressLabel(property),
+          cityLabel: property.address?.city ?? '',
+        ),
       ),
     );
   }

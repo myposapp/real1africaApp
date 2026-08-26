@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../providers/estate_provider.dart';
-import 'property_detail_screen.dart';
 
 class ManagerDetailScreen extends StatelessWidget {
   final EstateManager manager;
@@ -102,9 +101,12 @@ class ManagerDetailScreen extends StatelessWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {
                     estateProvider.setSelectedProperty(prop);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => PropertyDetailScreen(property: prop)),
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Open this listing from Explore to see live details.',
+                        ),
+                      ),
                     );
                   },
                 ),

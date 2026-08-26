@@ -3,11 +3,27 @@ import '../data/static_configs.dart';
 
 part 'property.mapper.dart';
 
+/// Shelf items returned by /api/utils/home-contents only populate the
+/// property's owner as a raw id string instead of the full user object
+/// every other endpoint returns. This hook normalizes both shapes so
+/// [PropertyOwner] can always be decoded from the "user" field.
+class _PropertyOwnerHook extends MappingHook {
+  const _PropertyOwnerHook();
+
+  @override
+  dynamic beforeDecode(dynamic value) {
+    if (value is String) {
+      return {"_id": value};
+    }
+    return value;
+  }
+}
+
 @MappableClass()
 class PropertyOwner with PropertyOwnerMappable {
   const PropertyOwner({
     required this.id,
-    required this.name,
+    this.name,
     this.phone,
     this.email,
     this.photo,
@@ -16,7 +32,7 @@ class PropertyOwner with PropertyOwnerMappable {
 
   @MappableField(key: "_id")
   final String id;
-  final String name;
+  final String? name;
   final String? phone;
   final String? email;
   final String? photo;
@@ -143,7 +159,7 @@ class Property with PropertyMappable {
 
   @MappableField(key: "_id")
   final String id;
-  @MappableField(key: "user")
+  @MappableField(key: "user", hook: _PropertyOwnerHook())
   final PropertyOwner owner;
   final List<PropertyCategoryRef> categories;
   final String title;

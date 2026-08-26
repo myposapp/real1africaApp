@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
-import '../models/models.dart';
 
 class FullMapDialog extends StatelessWidget {
-  final Property property;
+  final String propertyTitle;
+  final String priceLabel;
+  final String addressLabel;
+  final String cityLabel;
 
-  const FullMapDialog({super.key, required this.property});
+  const FullMapDialog({
+    super.key,
+    required this.propertyTitle,
+    required this.priceLabel,
+    required this.addressLabel,
+    required this.cityLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +20,7 @@ class FullMapDialog extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${property.title} - Map View'),
+        title: Text('$propertyTitle - Map View'),
         actions: [
           IconButton(
             icon: const Icon(Icons.share_outlined),
@@ -41,7 +49,7 @@ class FullMapDialog extends StatelessWidget {
                   painter: _MapGridPainter(
                     gridColor: theme.brightness == Brightness.dark
                         ? Colors.white10
-                        : Colors.black.withOpacity(0.06),
+                        : Colors.black.withValues(alpha: 0.06),
                   ),
                 ),
 
@@ -57,7 +65,7 @@ class FullMapDialog extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.25),
+                              color: Colors.black.withValues(alpha: 0.25),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             )
@@ -69,7 +77,7 @@ class FullMapDialog extends StatelessWidget {
                             const Icon(Icons.home_filled, color: Colors.white, size: 16),
                             const SizedBox(width: 6),
                             Text(
-                              '\$${property.price.toInt()}${property.priceUnit}',
+                              priceLabel,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -120,7 +128,7 @@ class FullMapDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
@@ -136,42 +144,29 @@ class FullMapDialog extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          property.location,
+                          addressLabel,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
                           ),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.secondaryContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          property.city,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.onSecondaryContainer,
+                      if (cityLabel.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            cityLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSecondaryContainer,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Nearby Landmarks:',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildLandmarkBadge(Icons.directions_subway, '0.4 mi Metro', theme),
-                      _buildLandmarkBadge(Icons.school, '0.8 mi School', theme),
-                      _buildLandmarkBadge(Icons.shopping_bag, '1.1 mi Mall', theme),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -181,7 +176,7 @@ class FullMapDialog extends StatelessWidget {
                       onPressed: () {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Opening turn-by-turn directions to ${property.location}...')),
+                          SnackBar(content: Text('Opening turn-by-turn directions to $addressLabel...')),
                         );
                       },
                       icon: const Icon(Icons.turn_right_rounded),
@@ -204,7 +199,7 @@ class FullMapDialog extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 8,
           )
         ],
@@ -213,19 +208,6 @@ class FullMapDialog extends StatelessWidget {
         icon: Icon(icon, size: 20),
         onPressed: onPressed,
       ),
-    );
-  }
-
-  Widget _buildLandmarkBadge(IconData icon, String text, ThemeData theme) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: theme.colorScheme.primary),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
-        ),
-      ],
     );
   }
 }

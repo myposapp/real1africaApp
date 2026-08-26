@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/saved_property.dart';
 import '../../network/provider/network_provider.dart';
+import '../../providers/estate_provider.dart';
 
 class SavedPropertiesTab extends StatefulWidget {
   final Color primaryRed;
@@ -45,6 +46,9 @@ class _SavedPropertiesTabState extends State<SavedPropertiesTab> {
           _error = response.message ?? 'Could not load saved properties.';
         }
       });
+      context.read<EstateProvider>().setSavedPropertyIds(
+        _saved.map((s) => s.property.id),
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -74,6 +78,7 @@ class _SavedPropertiesTabState extends State<SavedPropertiesTab> {
         _showSnackBar(response.message ?? 'Could not remove property.');
         return;
       }
+      if (mounted) context.read<EstateProvider>().markUnsaved(saved.property.id);
       _showSnackBar('Removed from saved properties');
       widget.onChanged();
     } catch (_) {

@@ -10,6 +10,11 @@ class EstateProvider extends ChangeNotifier {
   Property? _selectedProperty;
   EstateManager? _selectedManager;
 
+  // Cross-screen UI state for the real-API search/home flow.
+  String? _selectedCategoryId;
+  String? _selectedCategoryTitle;
+  final Set<String> _savedPropertyIds = {};
+
   UserProfile _user = UserProfile(
     fullName: 'Estate manager 1',
     email: 'test1@app3star.com',
@@ -267,6 +272,8 @@ class EstateProvider extends ChangeNotifier {
   String get selectedCity => _selectedCity;
   Property? get selectedProperty => _selectedProperty;
   EstateManager? get selectedManager => _selectedManager;
+  String? get selectedCategoryId => _selectedCategoryId;
+  String? get selectedCategoryTitle => _selectedCategoryTitle;
   UserProfile get user => _user;
   List<Property> get properties => _properties;
   List<Property> get myProperties => _myProperties;
@@ -322,6 +329,31 @@ class EstateProvider extends ChangeNotifier {
 
   void setSelectedManager(EstateManager manager) {
     _selectedManager = manager;
+    notifyListeners();
+  }
+
+  void setSelectedCategory(String? id, String? title) {
+    _selectedCategoryId = id;
+    _selectedCategoryTitle = title;
+    notifyListeners();
+  }
+
+  bool isSaved(String propertyId) => _savedPropertyIds.contains(propertyId);
+
+  void setSavedPropertyIds(Iterable<String> ids) {
+    _savedPropertyIds
+      ..clear()
+      ..addAll(ids);
+    notifyListeners();
+  }
+
+  void markSaved(String propertyId) {
+    _savedPropertyIds.add(propertyId);
+    notifyListeners();
+  }
+
+  void markUnsaved(String propertyId) {
+    _savedPropertyIds.remove(propertyId);
     notifyListeners();
   }
 
