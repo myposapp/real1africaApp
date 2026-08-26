@@ -4,6 +4,7 @@ library;
 import 'package:estate_ease/network/provider/network_provider.dart';
 import 'package:estate_ease/providers/person_provider.dart';
 import 'package:estate_ease/providers/preferences_provider.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dart_mappable/dart_mappable.dart';
 import 'package:provider/provider.dart';
@@ -22,6 +23,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   initializeMappers();
+
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
 
   final prefProvider = await PreferenceProvider.create();
 
@@ -47,7 +52,7 @@ class EstateEaseApp extends StatelessWidget {
     final themeProvider = context.watch<ThemeProvider>();
 
     return MaterialApp(
-      title: 'EstateEase',
+      title: 'Real1 Africa',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

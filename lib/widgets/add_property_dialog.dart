@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import '../providers/estate_provider.dart';
-import '../models/models.dart';
+import '../models/property.dart';
+import '../models/property_category.dart';
+import '../network/provider/network_provider.dart';
 
 class AddPropertyDialog extends StatefulWidget {
   const AddPropertyDialog({super.key});
@@ -13,57 +16,122 @@ class AddPropertyDialog extends StatefulWidget {
 class _AddPropertyDialogState extends State<AddPropertyDialog> {
   final _formKey = GlobalKey<FormState>();
 
-  String _title = '';
-  String _type = 'Rent';
-  String _category = 'Land for sale';
-  String _subcategory = 'Residential Land';
-  String _location = '';
-  double _price = 5000000;
-  String _priceUnit = 'total';
-  int _beds = 3;
-  int _baths = 2;
-  int _sqft = 1500;
-  String _description = '';
-  String _status = 'Active';
-  String _visibility = 'Public';
-  bool _isSubmitting = false;
+  List<PropertyCategory> _categories = [];
+  bool _isLoadingCategories = true;
+  String? _selectedCategoryId;
 
-  final Map<String, List<String>> _categories = {
-    'Land for sale': [
-      'Residential Land',
-      'Commercial Plot',
-      'Farmland / Agricultural',
-      'Industrial Land',
-    ],
-    'Stores for rent': [
-      'Retail Storefront',
-      'Shopping Complex Unit',
-      'Warehouse Storage',
-      'Office Suite',
-    ],
-    'Duplex & Mansions': [
-      'Detached Duplex',
-      'Semi-Detached Duplex',
-      'Terrace Duplex',
-      'Penthouse Mansion',
-    ],
-    'Apartments & Flats': [
-      '1 Bedroom Mini Flat',
-      '2 Bedroom Flat',
-      '3 Bedroom Luxury Apartment',
-      'Studio Flat',
-    ],
-    'Shortlets & Holiday Homes': [
-      'Serviced Studio',
-      'Waterfront Shortlet',
-      'Luxury Penthouse Suite',
-    ],
-  };
+  String _title = '';
+  String _description = '';
+  String _street = '';
+  String _city = '';
+  String _state = '';
+  String _country = 'Nigeria';
+  double _price = 5000000;
+
+  bool _forSale = true;
+  String _visibility = 'public';
+
+  final List<File> _media = [];
+  bool _isSubmitting = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    final networkRepo = context.read<NetworkProvider>().networkRepo;
+    try {
+      final response = await networkRepo.getPropertyCategories(pageSize: 100);
+      if (!mounted) return;
+      setState(() {
+        _categories = response.data ?? [];
+        _isLoadingCategories = false;
+        if (_categories.isNotEmpty) {
+          _selectedCategoryId = _categories.first.id;
+        } else {
+          _errorMessage = 'No property categories are available yet.';
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingCategories = false;
+        _errorMessage = 'Could not load property categories.';
+      });
+    }
+  }
+
+  Future<void> _pickMedia() async {
+    final picked = await ImagePicker().pickMultiImage(imageQuality: 85);
+    if (picked.isNotEmpty) {
+      setState(() => _media.addAll(picked.map((x) => File(x.path))));
+    }
+  }
+
+  Future<void> _submit() async {
+    setState(() => _errorMessage = null);
+
+    if (_selectedCategoryId == null) {
+      setState(() => _errorMessage = 'Please select a category.');
+      return;
+    }
+    if (_media.isEmpty) {
+      setState(() => _errorMessage = 'Please add at least one photo.');
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
+    _formKey.currentState!.save();
+
+    setState(() => _isSubmitting = true);
+
+    final networkRepo = context.read<NetworkProvider>().networkRepo;
+
+    try {
+      final response = await networkRepo.createProperty(
+        title: _title,
+        description: _description,
+        categoryIds: [_selectedCategoryId!],
+        address: PropertyAddress(
+          street: _street,
+          city: _city,
+          state: _state,
+          country: _country,
+        ),
+        status: 'active',
+        forSale: _forSale,
+        forRent: !_forSale,
+        visibility: _visibility,
+        media: _media,
+        salePrice: _forSale ? _price : null,
+        rentPrice: !_forSale ? _price : null,
+      );
+
+      if (!mounted) return;
+
+      if (response.success != true) {
+        setState(() {
+          _isSubmitting = false;
+          _errorMessage = response.message ?? 'Could not create property.';
+        });
+        return;
+      }
+
+      Navigator.pop(context, true);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = 'Something went wrong. Please check your connection.';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    //final theme = Theme.of(context);
-    final subcategories = _categories[_category] ?? ['General'];
+    final theme = Theme.of(context);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -87,244 +155,219 @@ class _AddPropertyDialogState extends State<AddPropertyDialog> {
               ],
             ),
             const Divider(),
+            if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      color: theme.colorScheme.onErrorContainer,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
             Expanded(
-              child: SingleChildScrollView(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
-                      // Category
-                      DropdownButtonFormField<String>(
-                        initialValue: _category,
-                        decoration: const InputDecoration(
-                          labelText: 'Category *',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
-                        ),
-                        items: _categories.keys
-                            .map(
-                              (c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(
-                                  c,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) {
-                          setState(() {
-                            _category = v!;
-                            _subcategory = _categories[_category]!.first;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Subcategory
-                      DropdownButtonFormField<String>(
-                        initialValue: _subcategory,
-                        decoration: const InputDecoration(
-                          labelText: 'Sub Category *',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
-                        ),
-                        items: subcategories
-                            .map(
-                              (s) => DropdownMenuItem(
-                                value: s,
-                                child: Text(
-                                  s,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) => setState(() => _subcategory = v!),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Title
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Property Title *',
-                          hintText: 'e.g. 20 x 100 Prime Dry Land',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
-                        ),
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'Required' : null,
-                        onSaved: (v) => _title = v ?? '',
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Type & Price
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _type,
+              child: _isLoadingCategories
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 8),
+                            // Category
+                            DropdownButtonFormField<String>(
+                              initialValue: _selectedCategoryId,
                               decoration: const InputDecoration(
-                                labelText: 'Listing Type',
+                                labelText: 'Category *',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.all(
                                     Radius.circular(12),
                                   ),
                                 ),
                               ),
-                              items: ['Rent', 'Sales', 'Lease']
+                              items: _categories
                                   .map(
-                                    (e) => DropdownMenuItem(
-                                      value: e,
+                                    (c) => DropdownMenuItem(
+                                      value: c.id,
                                       child: Text(
-                                        e,
+                                        c.parentCategory != null
+                                            ? '— ${c.title}'
+                                            : c.title,
                                         style: const TextStyle(fontSize: 13),
                                       ),
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (v) {
-                                setState(() {
-                                  _type = v!;
-                                  _priceUnit = _type == 'Sales'
-                                      ? 'total'
-                                      : '/yr';
-                                });
-                              },
+                              onChanged: (v) =>
+                                  setState(() => _selectedCategoryId = v),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextFormField(
+                            const SizedBox(height: 12),
+
+                            // Title
+                            TextFormField(
                               decoration: const InputDecoration(
-                                labelText: 'Price (₦) *',
-                                prefixText: '₦ ',
+                                labelText: 'Property Title *',
+                                hintText: 'e.g. 20 x 100 Prime Dry Land',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.all(
                                     Radius.circular(12),
                                   ),
                                 ),
                               ),
-                              keyboardType: TextInputType.number,
-                              initialValue: '5000000',
                               validator: (v) =>
                                   v == null || v.isEmpty ? 'Required' : null,
-                              onSaved: (v) => _price =
-                                  double.tryParse(v ?? '5000000') ?? 5000000,
+                              onSaved: (v) => _title = v ?? '',
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                      // Location
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Location / Address *',
-                          hintText: 'e.g. Lekki Phase 1, Lagos',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
-                        ),
-                        validator: (v) =>
-                            v == null || v.isEmpty ? 'Required' : null,
-                        onSaved: (v) => _location = v ?? '',
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Beds & Baths & Sqft
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              decoration: const InputDecoration(
-                                labelText: 'Beds',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                ),
-                              ),
-                              keyboardType: TextInputType.number,
-                              initialValue: '3',
-                              onSaved: (v) =>
-                                  _beds = int.tryParse(v ?? '3') ?? 3,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: TextFormField(
-                              decoration: const InputDecoration(
-                                labelText: 'Baths',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                ),
-                              ),
-                              keyboardType: TextInputType.number,
-                              initialValue: '2',
-                              onSaved: (v) =>
-                                  _baths = int.tryParse(v ?? '2') ?? 2,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: TextFormField(
-                              decoration: const InputDecoration(
-                                labelText: 'Sqft',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                ),
-                              ),
-                              keyboardType: TextInputType.number,
-                              initialValue: '1500',
-                              onSaved: (v) =>
-                                  _sqft = int.tryParse(v ?? '1500') ?? 1500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Status & Visibility
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _status,
-                              decoration: const InputDecoration(
-                                labelText: 'Status',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                ),
-                              ),
-                              items: ['Active', 'Draft', 'Under Offer']
-                                  .map(
-                                    (s) => DropdownMenuItem(
-                                      value: s,
-                                      child: Text(
-                                        s,
-                                        style: const TextStyle(fontSize: 13),
+                            // Type & Price
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<bool>(
+                                    initialValue: _forSale,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Listing Type',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.all(
+                                          Radius.circular(12),
+                                        ),
                                       ),
                                     ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) => setState(() => _status = v!),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: true,
+                                        child: Text(
+                                          'For Sale',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: false,
+                                        child: Text(
+                                          'For Rent',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (v) =>
+                                        setState(() => _forSale = v!),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextFormField(
+                                    decoration: InputDecoration(
+                                      labelText: _forSale
+                                          ? 'Sale Price (₦) *'
+                                          : 'Rent Price (₦) *',
+                                      prefixText: '₦ ',
+                                      border: const OutlineInputBorder(
+                                        borderRadius: BorderRadius.all(
+                                          Radius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    initialValue: '5000000',
+                                    validator: (v) => v == null || v.isEmpty
+                                        ? 'Required'
+                                        : null,
+                                    onSaved: (v) => _price =
+                                        double.tryParse(v ?? '5000000') ??
+                                        5000000,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
+                            const SizedBox(height: 12),
+
+                            // Street
+                            TextFormField(
+                              decoration: const InputDecoration(
+                                labelText: 'Street Address *',
+                                hintText: 'e.g. 12 Admiralty Way',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? 'Required' : null,
+                              onSaved: (v) => _street = v ?? '',
+                            ),
+                            const SizedBox(height: 12),
+
+                            // City & State
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'City *',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.all(
+                                          Radius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                    validator: (v) => v == null || v.isEmpty
+                                        ? 'Required'
+                                        : null,
+                                    onSaved: (v) => _city = v ?? '',
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextFormField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'State *',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.all(
+                                          Radius.circular(12),
+                                        ),
+                                      ),
+                                    ),
+                                    validator: (v) => v == null || v.isEmpty
+                                        ? 'Required'
+                                        : null,
+                                    onSaved: (v) => _state = v ?? '',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            TextFormField(
+                              initialValue: _country,
+                              decoration: const InputDecoration(
+                                labelText: 'Country *',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              validator: (v) =>
+                                  v == null || v.isEmpty ? 'Required' : null,
+                              onSaved: (v) => _country = v ?? 'Nigeria',
+                            ),
+                            const SizedBox(height: 12),
+
+                            // Visibility
+                            DropdownButtonFormField<String>(
                               initialValue: _visibility,
                               decoration: const InputDecoration(
                                 labelText: 'Visibility',
@@ -334,42 +377,114 @@ class _AddPropertyDialogState extends State<AddPropertyDialog> {
                                   ),
                                 ),
                               ),
-                              items: ['Public', 'Private']
-                                  .map(
-                                    (vis) => DropdownMenuItem(
-                                      value: vis,
-                                      child: Text(
-                                        vis,
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'public',
+                                  child: Text(
+                                    'Public',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'private',
+                                  child: Text(
+                                    'Private',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ],
                               onChanged: (v) =>
                                   setState(() => _visibility = v!),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                      // Description
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Description',
-                          hintText:
-                              'Enter comprehensive property information, amenities, and title docs...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
+                            // Description
+                            TextFormField(
+                              decoration: const InputDecoration(
+                                labelText: 'Description',
+                                hintText:
+                                    'Enter comprehensive property information, amenities, and title docs...',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
+                                ),
+                              ),
+                              maxLines: 3,
+                              onSaved: (v) => _description = v ?? '',
+                            ),
+                            const SizedBox(height: 12),
+
+                            Text(
+                              'Photos *',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                ..._media.asMap().entries.map(
+                                  (entry) => Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Image.file(
+                                          entry.value,
+                                          width: 70,
+                                          height: 70,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: -6,
+                                        right: -6,
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.cancel,
+                                            size: 18,
+                                            color: Colors.red,
+                                          ),
+                                          onPressed: () => setState(
+                                            () => _media.removeAt(entry.key),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: _pickMedia,
+                                  child: Container(
+                                    width: 70,
+                                    height: 70,
+                                    decoration: BoxDecoration(
+                                      color: theme
+                                          .colorScheme
+                                          .surfaceContainerHighest
+                                          .withValues(alpha: 0.4),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: theme.colorScheme.outlineVariant,
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.add_a_photo_outlined,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                        maxLines: 3,
-                        onSaved: (v) => _description = v ?? '',
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ),
             const Divider(),
             Row(
@@ -389,61 +504,9 @@ class _AddPropertyDialogState extends State<AddPropertyDialog> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _isSubmitting
+                    onPressed: (_isSubmitting || _isLoadingCategories)
                         ? null
-                        : () {
-                            if (_formKey.currentState!.validate()) {
-                              _formKey.currentState!.save();
-                              setState(() => _isSubmitting = true);
-                              Future.delayed(const Duration(milliseconds: 600), () {
-                                final newProperty = Property(
-                                  id: 'p_${DateTime.now().millisecondsSinceEpoch}',
-                                  title: _title,
-                                  type: _type,
-                                  category: _category,
-                                  subcategory: _subcategory,
-                                  location: _location,
-                                  city: 'Lagos',
-                                  price: _price,
-                                  priceUnit: _priceUnit,
-                                  beds: _beds,
-                                  baths: _baths,
-                                  sqft: _sqft,
-                                  status: _status,
-                                  visibility: _visibility,
-                                  addedAt: 'Just now',
-                                  image:
-                                      'https://lh3.googleusercontent.com/aida-public/AB6AXuAaUZNWGCBz8cJAAC9vAQ6QabqS7ZGRoS2dIL58D6VaKnatpzbWnD5Y90tkX_WVUHTbrINl242BuaywUiUdGL4ED3qLTF3XgAYmRtmQ-6jfTVfC8gULAo5hWT0OvMCEuQFRNYDPuEReQ9sKudUd5NVmN2Ef_PuvykK4P6kHtHRAGRnDP0uIneeA6paDAN78nF2w8gUu-FOFvC8AsB4O-vNuLJeFOOLzI0Orx55oHUf1R0fw4_j4TpnfBZVShnbrY4jtfBjDoV57i1X9',
-                                  gallery: [
-                                    'https://lh3.googleusercontent.com/aida-public/AB6AXuAaUZNWGCBz8cJAAC9vAQ6QabqS7ZGRoS2dIL58D6VaKnatpzbWnD5Y90tkX_WVUHTbrINl242BuaywUiUdGL4ED3qLTF3XgAYmRtmQ-6jfTVfC8gULAo5hWT0OvMCEuQFRNYDPuEReQ9sKudUd5NVmN2Ef_PuvykK4P6kHtHRAGRnDP0uIneeA6paDAN78nF2w8gUu-FOFvC8AsB4O-vNuLJeFOOLzI0Orx55oHUf1R0fw4_j4TpnfBZVShnbrY4jtfBjDoV57i1X9',
-                                    'https://lh3.googleusercontent.com/aida-public/AB6AXuAMsZ5s6A6R4fLIL6j36xUqInN0QG8Yn4xJ8sE3I8a-y4O0n9gH6c5m0kF3h_2qP_8v0iI8pY9zA4O_L6zB4yF_u3L5kC_2I5y7X_6M6I5G_3kL_7n_2s3G',
-                                  ],
-                                  isNew: true,
-                                  description: _description.isNotEmpty
-                                      ? _description
-                                      : 'Newly listed estate property.',
-                                  amenities: [
-                                    Amenity(
-                                      icon: 'verified',
-                                      name: 'Document Verified',
-                                    ),
-                                    Amenity(
-                                      icon: 'local_parking',
-                                      name: 'Access Road',
-                                    ),
-                                  ],
-                                  managerId: 'm1',
-                                  managerName: 'Estate manager 1',
-                                );
-                                if (context.mounted) {
-                                  context.read<EstateProvider>().addProperty(
-                                    newProperty,
-                                  );
-                                  Navigator.pop(context);
-                                }
-                              });
-                            }
-                          },
+                        : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFC00016),
                       foregroundColor: Colors.white,

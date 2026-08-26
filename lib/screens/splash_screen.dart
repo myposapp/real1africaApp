@@ -1,4 +1,6 @@
 import 'package:estate_ease/data/static_configs.dart';
+import 'package:estate_ease/models/user_profile.dart';
+import 'package:estate_ease/providers/person_provider.dart';
 import 'package:estate_ease/providers/preferences_provider.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
@@ -43,6 +45,20 @@ class _SplashScreenState extends State<SplashScreen>
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
         var prefs = context.read<PreferenceProvider>();
+
+        final cachedProfileJson = prefs.getString(EstateConfigs.profileKey);
+        if (cachedProfileJson != null) {
+          try {
+            final cachedProfile = UserProfile.fromJson(cachedProfileJson);
+            context.read<ProfileProvider>().setUserProfile(
+              cachedProfile,
+              source: UserSource.cache,
+            );
+          } catch (error) {
+            debugPrint('Cached profile malformed/stale: $error');
+          }
+        }
+
         if (prefs.getBool(EstateConfigs.onboardedKey) == true) {
           Navigator.pushReplacementNamed(context, '/main');
         } else {

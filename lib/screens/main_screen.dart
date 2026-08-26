@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/estate_provider.dart';
-import '../widgets/add_property_dialog.dart';
+// import '../widgets/add_property_dialog.dart';
 import 'home_screen.dart';
 import 'search_listings_screen.dart';
 import 'estate_managers_screen.dart';
-import 'messages_screen.dart';
+// import 'messages_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatelessWidget {
@@ -15,7 +15,7 @@ class MainScreen extends StatelessWidget {
     HomeScreen(),
     SearchListingsScreen(),
     EstateManagersScreen(),
-    MessagesScreen(),
+    // MessagesScreen(),
     ProfileScreen(),
   ];
 
@@ -36,17 +36,21 @@ class MainScreen extends StatelessWidget {
                 color: theme.colorScheme.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.real_estate_agent, size: 18, color: Colors.white),
+              child: const Icon(
+                Icons.real_estate_agent,
+                size: 18,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(width: 8),
             const Text(
-              'EstateEase',
+              'Real1 Africa',
               style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
             ),
           ],
         ),
         actions: [
-          IconButton(
+          /*IconButton(
             icon: const Icon(Icons.add_circle_outline_rounded),
             tooltip: 'Add Property',
             onPressed: () {
@@ -55,7 +59,7 @@ class MainScreen extends StatelessWidget {
                 builder: (_) => const AddPropertyDialog(),
               );
             },
-          ),
+          ),*/
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded),
             onPressed: () {
@@ -87,11 +91,11 @@ class MainScreen extends StatelessWidget {
             selectedIcon: Icon(Icons.business),
             label: 'Managers',
           ),
-          NavigationDestination(
+          /*NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
             label: 'Messages',
-          ),
+          ),*/
           NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),

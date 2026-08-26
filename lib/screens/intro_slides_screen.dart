@@ -59,7 +59,7 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
         curve: Curves.easeInOut,
       );
     } else {
-      Navigator.pushReplacementNamed(context, '/login');
+      Navigator.pushReplacementNamed(context, '/main');
     }
   }
 
@@ -114,7 +114,7 @@ class _IntroSlidesScreenState extends State<IntroSlidesScreen> {
                   ),
                   TextButton(
                     onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/login'),
+                        Navigator.pushReplacementNamed(context, '/main'),
                     child: Text(
                       'Skip',
                       style: TextStyle(
