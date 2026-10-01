@@ -107,4 +107,70 @@ abstract class NetworkClient {
 
   @DELETE("/api/property-categories/{id}")
   Future<dynamic> deletePropertyCategory(@Path("id") String id);
+
+  // Social
+
+  @GET("/api/social/posts")
+  Future<dynamic> getSocialPosts(@Queries() Map<String, dynamic> query);
+
+  @POST("/api/social/posts")
+  @MultiPart()
+  Future<dynamic> createSocialPost(@Body() FormData body);
+
+  @PUT("/api/social/posts/{postId}")
+  Future<dynamic> updateSocialPost(
+    @Path("postId") String postId,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @PUT("/api/social/posts/{postId}")
+  @MultiPart()
+  Future<dynamic> updateSocialPostWithMedia(
+    @Path("postId") String postId,
+    @Body() FormData body,
+  );
+
+  @DELETE("/api/social/posts/{postId}")
+  Future<dynamic> deleteSocialPost(@Path("postId") String postId);
+
+  @POST("/api/social/posts/{postId}/react")
+  Future<dynamic> toggleSocialPostLike(@Path("postId") String postId);
+
+  @GET("/api/social/posts/{postId}/comments")
+  Future<dynamic> getSocialPostComments(
+    @Path("postId") String postId,
+    @Queries() Map<String, dynamic> query,
+  );
+
+  @POST("/api/social/posts/{postId}/comments")
+  Future<dynamic> createSocialComment(
+    @Path("postId") String postId,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @PUT("/api/social/posts/{postId}/comments/{commentId}")
+  Future<dynamic> updateSocialComment(
+    @Path("postId") String postId,
+    @Path("commentId") String commentId,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @DELETE("/api/social/posts/{postId}/comments/{commentId}")
+  Future<dynamic> deleteSocialComment(
+    @Path("postId") String postId,
+    @Path("commentId") String commentId,
+  );
+
+  @POST("/api/social/posts/{postId}/comments/{commentId}/reply")
+  Future<dynamic> replyToSocialComment(
+    @Path("postId") String postId,
+    @Path("commentId") String commentId,
+    @Body() Map<String, dynamic> body,
+  );
+
+  @POST("/api/social/posts/{postId}/comments/{commentId}/react")
+  Future<dynamic> toggleSocialCommentLike(
+    @Path("postId") String postId,
+    @Path("commentId") String commentId,
+  );
 }

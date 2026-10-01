@@ -11,8 +11,9 @@ import 'models/property.dart' as p3;
 import 'models/property_category.dart' as p4;
 import 'models/property_search_response.dart' as p5;
 import 'models/saved_property.dart' as p6;
-import 'models/user_profile.dart' as p7;
-import 'network/model/base_api_response.dart' as p8;
+import 'models/social_post.dart' as p7;
+import 'models/user_profile.dart' as p8;
+import 'network/model/base_api_response.dart' as p9;
 
 void initializeMappers() {
   p0.AnalyticsMapper.ensureInitialized();
@@ -35,8 +36,14 @@ void initializeMappers() {
   p5.AmenityProfileMapper.ensureInitialized();
   p5.PropertySearchResponseMapper.ensureInitialized();
   p6.SavedPropertyMapper.ensureInitialized();
-  p7.UserProfileMapper.ensureInitialized();
-  p8.BaseResponseMapper.ensureInitialized();
-  p8.ResponseMetadataMapper.ensureInitialized();
+  p7.SocialAuthorMapper.ensureInitialized();
+  p7.SocialMediaMapper.ensureInitialized();
+  p7.SocialLinkedPropertyMapper.ensureInitialized();
+  p7.SocialPostMapper.ensureInitialized();
+  p7.SocialCommentMapper.ensureInitialized();
+  p7.SocialReactionMapper.ensureInitialized();
+  p8.UserProfileMapper.ensureInitialized();
+  p9.BaseResponseMapper.ensureInitialized();
+  p9.ResponseMetadataMapper.ensureInitialized();
 }
 

@@ -11,6 +11,7 @@ import '../../models/property.dart';
 import '../../models/property_category.dart';
 import '../../models/property_search_response.dart';
 import '../../models/saved_property.dart';
+import '../../models/social_post.dart';
 import '../../models/user_profile.dart';
 import '../model/base_api_response.dart';
 import 'network_service.dart';
@@ -511,5 +512,189 @@ class NetworkRepo {
   Future<BaseResponse<void>> deleteKyc(String kycId) async {
     final response = await _client.deleteKyc(kycId) as Map<String, dynamic>;
     return BaseResponse.fromMap<void>(response);
+  }
+
+  // Social
+
+  Future<BaseResponse<List<SocialPost>>> getSocialPosts({
+    int page = 1,
+    int pageSize = 20,
+    String? authorId,
+    String? linkedPropertyId,
+    String? tag,
+    String? search,
+    String? status,
+    String? visibility,
+  }) async {
+    final query = {
+      "page": page,
+      "pageSize": pageSize,
+      if (authorId != null) "author": authorId,
+      if (linkedPropertyId != null) "linkedProperty": linkedPropertyId,
+      if (tag != null) "tag": tag,
+      if (search != null) "search": search,
+      if (status != null) "status": status,
+      if (visibility != null) "visibility": visibility,
+    };
+
+    final response = await _client.getSocialPosts(query) as Map<String, dynamic>;
+    return BaseResponse.fromMap<List<SocialPost>>(response);
+  }
+
+  /// A post must contain [content] or at least one [media] file (max 10
+  /// images/videos). [visibility] is "public", "followers" or "private".
+  Future<BaseResponse<SocialPost>> createSocialPost({
+    String? content,
+    List<File> media = const [],
+    List<String>? tags,
+    String? linkedPropertyId,
+    String visibility = "public",
+  }) async {
+    final body = {
+      if (content != null) "content": content,
+      if (tags != null) "tags": jsonEncode(tags),
+      if (linkedPropertyId != null) "linkedProperty": linkedPropertyId,
+      "visibility": visibility,
+      if (media.isNotEmpty) "media": await _socialMediaFiles(media),
+    };
+
+    final response =
+        await _client.createSocialPost(FormData.fromMap(body))
+            as Map<String, dynamic>;
+    return BaseResponse.fromMap<SocialPost>(response);
+  }
+
+  /// Updates text metadata only, keeping existing media. Passing [media]
+  /// replaces all of the post's existing media.
+  Future<BaseResponse<SocialPost>> updateSocialPost(
+    String postId, {
+    String? content,
+    List<String>? tags,
+    String? visibility,
+    List<File>? media,
+  }) async {
+    final Map<String, dynamic> response;
+
+    if (media != null && media.isNotEmpty) {
+      final body = {
+        if (content != null) "content": content,
+        if (tags != null) "tags": jsonEncode(tags),
+        if (visibility != null) "visibility": visibility,
+        "media": await _socialMediaFiles(media),
+      };
+      response =
+          await _client.updateSocialPostWithMedia(
+                postId,
+                FormData.fromMap(body),
+              )
+              as Map<String, dynamic>;
+    } else {
+      final body = {
+        if (content != null) "content": content,
+        if (tags != null) "tags": tags,
+        if (visibility != null) "visibility": visibility,
+      };
+      response =
+          await _client.updateSocialPost(postId, body) as Map<String, dynamic>;
+    }
+
+    return BaseResponse.fromMap<SocialPost>(response);
+  }
+
+  Future<BaseResponse<void>> deleteSocialPost(String postId) async {
+    final response =
+        await _client.deleteSocialPost(postId) as Map<String, dynamic>;
+    return BaseResponse.fromMap<void>(response);
+  }
+
+  Future<BaseResponse<SocialReaction>> toggleSocialPostLike(
+    String postId,
+  ) async {
+    final response =
+        await _client.toggleSocialPostLike(postId) as Map<String, dynamic>;
+    return BaseResponse.fromMap<SocialReaction>(response);
+  }
+
+  /// Returns top-level comments and replies in a single flat list, oldest
+  /// first. Replies carry the id of their top-level comment in
+  /// [SocialComment.parentComment].
+  Future<BaseResponse<List<SocialComment>>> getSocialPostComments(
+    String postId, {
+    int page = 1,
+    int pageSize = 100,
+  }) async {
+    final query = {"page": page, "pageSize": pageSize};
+
+    final response =
+        await _client.getSocialPostComments(postId, query)
+            as Map<String, dynamic>;
+    return BaseResponse.fromMap<List<SocialComment>>(response);
+  }
+
+  Future<BaseResponse<SocialComment>> createSocialComment(
+    String postId, {
+    required String content,
+  }) async {
+    final response =
+        await _client.createSocialComment(postId, {"content": content})
+            as Map<String, dynamic>;
+    return BaseResponse.fromMap<SocialComment>(response);
+  }
+
+  Future<BaseResponse<SocialComment>> updateSocialComment(
+    String postId,
+    String commentId, {
+    required String content,
+  }) async {
+    final response =
+        await _client.updateSocialComment(postId, commentId, {
+              "content": content,
+            })
+            as Map<String, dynamic>;
+    return BaseResponse.fromMap<SocialComment>(response);
+  }
+
+  Future<BaseResponse<void>> deleteSocialComment(
+    String postId,
+    String commentId,
+  ) async {
+    final response =
+        await _client.deleteSocialComment(postId, commentId)
+            as Map<String, dynamic>;
+    return BaseResponse.fromMap<void>(response);
+  }
+
+  Future<BaseResponse<SocialComment>> replyToSocialComment(
+    String postId,
+    String commentId, {
+    required String content,
+  }) async {
+    final response =
+        await _client.replyToSocialComment(postId, commentId, {
+              "content": content,
+            })
+            as Map<String, dynamic>;
+    return BaseResponse.fromMap<SocialComment>(response);
+  }
+
+  Future<BaseResponse<SocialReaction>> toggleSocialCommentLike(
+    String postId,
+    String commentId,
+  ) async {
+    final response =
+        await _client.toggleSocialCommentLike(postId, commentId)
+            as Map<String, dynamic>;
+    return BaseResponse.fromMap<SocialReaction>(response);
+  }
+
+  Future<List<MultipartFile>> _socialMediaFiles(List<File> media) async {
+    return [
+      for (final file in media)
+        await MultipartFile.fromFile(
+          file.path,
+          filename: file.path.split(Platform.pathSeparator).last,
+          contentType: MultipartFile.lookupMediaType(file.path),
+        ),
+    ];
   }
 }

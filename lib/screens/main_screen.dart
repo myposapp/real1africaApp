@@ -1,3 +1,4 @@
+import 'package:estate_ease/screens/socials_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/estate_provider.dart';
@@ -15,6 +16,7 @@ class MainScreen extends StatelessWidget {
     HomeScreen(),
     SearchListingsScreen(),
     EstateManagersScreen(),
+    SocialsScreen(),
     // MessagesScreen(),
     ProfileScreen(),
   ];
@@ -90,6 +92,11 @@ class MainScreen extends StatelessWidget {
             icon: Icon(Icons.business_outlined),
             selectedIcon: Icon(Icons.business),
             label: 'Managers',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Socials',
           ),
           /*NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
