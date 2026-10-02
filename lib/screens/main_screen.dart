@@ -5,7 +5,7 @@ import '../providers/estate_provider.dart';
 // import '../widgets/add_property_dialog.dart';
 import 'home_screen.dart';
 import 'search_listings_screen.dart';
-import 'estate_managers_screen.dart';
+//import 'estate_managers_screen.dart';
 // import 'messages_screen.dart';
 import 'profile_screen.dart';
 
@@ -15,7 +15,7 @@ class MainScreen extends StatelessWidget {
   final List<Widget> _screens = const [
     HomeScreen(),
     SearchListingsScreen(),
-    EstateManagersScreen(),
+    //EstateManagersScreen(),
     SocialsScreen(),
     // MessagesScreen(),
     ProfileScreen(),
@@ -88,11 +88,11 @@ class MainScreen extends StatelessWidget {
             selectedIcon: Icon(Icons.search),
             label: 'Explore',
           ),
-          NavigationDestination(
+          /*NavigationDestination(
             icon: Icon(Icons.business_outlined),
             selectedIcon: Icon(Icons.business),
             label: 'Managers',
-          ),
+          ),*/
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),

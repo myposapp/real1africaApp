@@ -1,3 +1,4 @@
+import 'package:estate_ease/models/user_profile.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../network/provider/network_provider.dart';
@@ -94,7 +95,9 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     return Scaffold(
       body: SafeArea(
-        child: (profile != null) ? _buildContent(theme) : _buildNotLoggedInUI(),
+        child: (profile != null)
+            ? _buildContent(theme, profile)
+            : _buildNotLoggedInUI(),
       ),
     );
   }
@@ -117,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildContent(ThemeData theme) {
+  Widget _buildContent(ThemeData theme, UserProfile profile) {
     return Column(
       children: [
         if (_isRefreshingProfile)
@@ -132,9 +135,18 @@ class _ProfileScreenState extends State<ProfileScreen>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'User Area',
+                  Text(
+                    profile.name,
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                  Text(
+                    "${profile.id} (${profile.userType ?? "User"})",
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    maxLines: 1,
                   ),
                   Text(
                     'Manage dashboard, listings, and security',
