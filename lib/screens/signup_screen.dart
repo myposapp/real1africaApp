@@ -157,7 +157,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       setState(() => _isLoading = false);
 
-      Navigator.pushReplacementNamed(context, '/main');
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (_) => false);
     } catch (_) {
       if (!mounted) return;
       setState(() {

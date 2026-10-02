@@ -108,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       setState(() => _isLoading = false);
 
-      Navigator.pushReplacementNamed(context, '/main');
+      Navigator.pushNamedAndRemoveUntil(context, '/main', (_) => false);
     } catch (_) {
       if (!mounted) return;
       setState(() {
